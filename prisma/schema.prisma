@@ -1,0 +1,63 @@
+// Prisma schema placeholder — to be expanded with Tournament domain entities
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-1.1.x", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tournament {
+  id        String   @id @default(uuid())
+  name      String
+  timezone  String
+  status    String   @default("draft")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  players   Player[]
+  rounds    Round[]
+}
+
+model Player {
+  id           String   @id @default(uuid())
+  tournamentId String
+  name         String
+  faction      String?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  pairingsA    Pairing[]  @relation("PlayerA")
+  pairingsB    Pairing[]  @relation("PlayerB")
+}
+
+model Round {
+  id           String   @id @default(uuid())
+  tournamentId String
+  number       Int
+  createdAt    DateTime @default(now())
+
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  pairings     Pairing[]
+
+  @@unique([tournamentId, number])
+}
+
+model Pairing {
+  id         String   @id @default(uuid())
+  roundId    String
+  table      Int
+  playerAId  String
+  playerBId  String?
+  createdAt  DateTime @default(now())
+
+  round      Round   @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  playerA    Player  @relation("PlayerA", fields: [playerAId], references: [id], onDelete: Cascade)
+  playerB    Player? @relation("PlayerB", fields: [playerBId], references: [id])
+
+  @@unique([roundId, table])
+}

@@ -1,0 +1,21 @@
+# Node / TypeScript
+node_modules
+dist
+*.log
+.env
+.env.local
+.env.development.local
+.DS_Store
+
+# Prisma
+prisma/.env
+
+# VSCode
+.vscode
+
+# Docker
+*.pid
+*.sock
+
+# Misc
+coverage

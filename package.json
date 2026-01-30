@@ -1,0 +1,27 @@
+{
+  "name": "bot-warhammer-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "npm@10",
+  "workspaces": [
+    "apps/bot",
+    "apps/api",
+    "apps/ui",
+    "packages/core"
+  ],
+  "scripts": {
+    "lint": "npm run lint --workspaces",
+    "build": "npm run build --workspaces",
+    "dev:bot": "npm --workspace apps/bot run dev",
+    "dev:api": "npm --workspace apps/api run dev",
+    "dev": "npm run dev:bot",
+    "format": "npm run format --workspaces",
+    "check": "npm run lint && npm test --workspaces",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev --name init"
+  },
+  "devDependencies": {
+    "prisma": "^5.10.2",
+    "typescript": "^5.3.3"
+  }
+}

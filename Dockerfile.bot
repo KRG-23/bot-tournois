@@ -1,0 +1,8 @@
+FROM node:20-slim
+RUN apt-get update && apt-get install -y openssl
+WORKDIR /workspace
+COPY package*.json tsconfig.base.json ./
+COPY apps/bot/package.json apps/bot/tsconfig.json /workspace/apps/bot/
+COPY packages/core /workspace/packages/core/
+RUN npm install && npm run build --workspace packages/core
+CMD ["npm", "--workspace", "apps/bot", "run", "dev"]
