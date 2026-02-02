@@ -33,6 +33,10 @@ model Player {
   tournamentId String
   name         String
   faction      String?
+  pseudo       String?
+  status       PlayerStatus   @default(PENDING)
+  listStatus   ListStatus     @default(LIST_NOT_SUBMITTED)
+  paymentStatus PaymentStatus @default(PAYMENT_PENDING)
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -40,6 +44,23 @@ model Player {
   tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   pairingsA    Pairing[]  @relation("PlayerA")
   pairingsB    Pairing[]  @relation("PlayerB")
+}
+
+enum PlayerStatus {
+  PENDING   // Inscription en attente (liste et/ou paiement à valider)
+  VALIDATED // Inscription validée
+}
+
+enum ListStatus {
+  LIST_WAITING       // Liste soumise, en attente de validation
+  LIST_ACCEPTED      // Liste acceptée
+  LIST_REFUSED       // Liste refusée
+  LIST_NOT_SUBMITTED // Liste non fournie
+}
+
+enum PaymentStatus {
+  PAYMENT_PENDING  // Paiement non reçu
+  PAYMENT_ACCEPTED // Paiement reçu/validé
 }
 
 model Round {

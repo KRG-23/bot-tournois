@@ -1,0 +1,14 @@
+-- CreateEnum
+CREATE TYPE "PlayerStatus" AS ENUM ('PENDING', 'VALIDATED');
+
+-- CreateEnum
+CREATE TYPE "ListStatus" AS ENUM ('LIST_WAITING', 'LIST_ACCEPTED', 'LIST_REFUSED', 'LIST_NOT_SUBMITTED');
+
+-- CreateEnum
+CREATE TYPE "PaymentStatus" AS ENUM ('PAYMENT_PENDING', 'PAYMENT_ACCEPTED');
+
+-- AlterTable
+ALTER TABLE "Player" ADD COLUMN     "listStatus" "ListStatus" NOT NULL DEFAULT 'LIST_NOT_SUBMITTED',
+ADD COLUMN     "paymentStatus" "PaymentStatus" NOT NULL DEFAULT 'PAYMENT_PENDING',
+ADD COLUMN     "pseudo" TEXT,
+ADD COLUMN     "status" "PlayerStatus" NOT NULL DEFAULT 'PENDING';

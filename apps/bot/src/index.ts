@@ -59,7 +59,12 @@ const commands = [
   new SlashCommandBuilder()
     .setName('round_generate')
     .setDescription('Génère un round Swiss pour un tournoi')
+    .addStringOption((o) => o.setName('tournament_id').setDescription('ID du tournoi').setRequired(true)),
+  new SlashCommandBuilder()
+    .setName('tournament_register')
+    .setDescription("S'inscrire à un tournoi (opt-in joueur)")
     .addStringOption((o) => o.setName('tournament_id').setDescription('ID du tournoi').setRequired(true))
+    .addStringOption((o) => o.setName('faction').setDescription('Faction/armée (optionnel)').setRequired(false))
 ].map((c) => c.toJSON());
 
 async function registerCommands() {
@@ -119,7 +124,8 @@ async function main() {
       try {
         const res = await fetch(`${apiBase}/tournaments/${tId}/rounds/generate`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 'Content-Type': 'application/json' },
+          body: '{}' // Fastify refuse un body vide quand content-type est JSON
         });
         if (!res.ok) {
           const text = await res.text();
@@ -131,6 +137,37 @@ async function main() {
           .map((p: any) => `Table ${p.table}: ${p.playerAId} vs ${p.playerBId ?? 'Bye'}`)
           .join('\n');
         await interaction.editReply(`Round ${data.number} généré:\n${lines}`);
+      } catch (err: any) {
+        await interaction.editReply(`Erreur: ${err.message}`);
+      }
+      return;
+    }
+
+    if (interaction.commandName === 'tournament_register') {
+      await interaction.deferReply({ ephemeral: true });
+      const tId = interaction.options.getString('tournament_id', true);
+      const faction = interaction.options.getString('faction') ?? undefined;
+      const name =
+        interaction.user.globalName ??
+        interaction.user.username ??
+        interaction.user.tag ??
+        `User-${interaction.user.id}`;
+      const pseudo = interaction.user.tag;
+      try {
+        const res = await fetch(`${apiBase}/tournaments/${tId}/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, pseudo, faction })
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          await interaction.editReply(`Erreur API: ${res.status} ${text}`);
+          return;
+        }
+        const data = (await res.json()) as any;
+        await interaction.editReply(
+          `Inscription enregistrée: ${data.name} (${data.pseudo ?? '—'}) — statut PENDING / liste non soumise / paiement en attente`
+        );
       } catch (err: any) {
         await interaction.editReply(`Erreur: ${err.message}`);
       }

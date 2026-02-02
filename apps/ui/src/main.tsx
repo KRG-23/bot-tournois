@@ -42,12 +42,19 @@ function App() {
     setPlayers([]);
   };
 
-  const addPlayer = async (name: string, faction?: string) => {
+  const addPlayer = async (payload: {
+    name: string;
+    faction?: string;
+    pseudo?: string;
+    status?: Player['status'];
+    listStatus?: Player['listStatus'];
+    paymentStatus?: Player['paymentStatus'];
+  }) => {
     if (!tournament) return;
     const res = await fetch(`${apiBase}/tournaments/${tournament.id}/players`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, faction })
+      body: JSON.stringify(payload)
     });
     const data = (await res.json()) as Player[];
     setPlayers(data);
@@ -55,6 +62,10 @@ function App() {
 
   const [playerName, setPlayerName] = useState('');
   const [playerFaction, setPlayerFaction] = useState('');
+  const [playerPseudo, setPlayerPseudo] = useState('');
+  const [playerStatus, setPlayerStatus] = useState<Player['status']>('PENDING');
+  const [listStatus, setListStatus] = useState<Player['listStatus']>('LIST_NOT_SUBMITTED');
+  const [paymentStatus, setPaymentStatus] = useState<Player['paymentStatus']>('PAYMENT_PENDING');
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: '1.5rem', fontFamily: 'Inter, system-ui, sans-serif' }}>
@@ -200,12 +211,51 @@ function App() {
           onChange={(e) => setPlayerFaction(e.target.value)}
           style={{ marginLeft: '0.5rem' }}
         />
+        <input
+          placeholder="Pseudo (Discord ou autre)"
+          value={playerPseudo}
+          onChange={(e) => setPlayerPseudo(e.target.value)}
+          style={{ marginLeft: '0.5rem' }}
+        />
+        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <label>Status
+            <select value={playerStatus} onChange={(e) => setPlayerStatus(e.target.value as Player['status'])} style={{ marginLeft: '0.25rem' }}>
+              <option value="PENDING">En attente</option>
+              <option value="VALIDATED">Validée</option>
+            </select>
+          </label>
+          <label>Liste
+            <select value={listStatus} onChange={(e) => setListStatus(e.target.value as Player['listStatus'])} style={{ marginLeft: '0.25rem' }}>
+              <option value="LIST_NOT_SUBMITTED">Non soumise</option>
+              <option value="LIST_WAITING">En attente de validation</option>
+              <option value="LIST_ACCEPTED">Acceptée</option>
+              <option value="LIST_REFUSED">Refusée</option>
+            </select>
+          </label>
+          <label>Paiement
+            <select value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value as Player['paymentStatus'])} style={{ marginLeft: '0.25rem' }}>
+              <option value="PAYMENT_PENDING">Non payé</option>
+              <option value="PAYMENT_ACCEPTED">Payé</option>
+            </select>
+          </label>
+        </div>
         <button
           style={{ marginLeft: '0.5rem' }}
           onClick={() => {
-            addPlayer(playerName, playerFaction || undefined);
+            addPlayer({
+              name: playerName,
+              faction: playerFaction || undefined,
+              pseudo: playerPseudo || undefined,
+              status: playerStatus,
+              listStatus,
+              paymentStatus
+            });
             setPlayerName('');
             setPlayerFaction('');
+            setPlayerPseudo('');
+            setPlayerStatus('PENDING');
+            setListStatus('LIST_NOT_SUBMITTED');
+            setPaymentStatus('PAYMENT_PENDING');
           }}
           disabled={!tournament || !playerName}
         >
@@ -213,7 +263,13 @@ function App() {
         </button>
         <ul>
           {players.map((p) => (
-            <li key={p.id}>{p.name} {p.faction ? `(${p.faction})` : ''}</li>
+            <li key={p.id}>
+              <strong>{p.name}</strong>
+              {p.pseudo ? ` [${p.pseudo}]` : ''} {p.faction ? `(${p.faction})` : ''}
+              {' — '}
+              Statut: {p.status ?? 'PENDING'} | Liste: {p.listStatus ?? 'LIST_NOT_SUBMITTED'} | Paiement:{' '}
+              {p.paymentStatus ?? 'PAYMENT_PENDING'}
+            </li>
           ))}
         </ul>
       </section>

@@ -3,6 +3,10 @@ export type Player = {
   name: string;
   faction?: string;
   active: boolean;
+  pseudo?: string;
+  status?: 'PENDING' | 'VALIDATED';
+  listStatus?: 'LIST_WAITING' | 'LIST_ACCEPTED' | 'LIST_REFUSED' | 'LIST_NOT_SUBMITTED';
+  paymentStatus?: 'PAYMENT_PENDING' | 'PAYMENT_ACCEPTED';
 };
 
 export type Pairing = {
