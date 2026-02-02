@@ -6,6 +6,7 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql://bot:botpass@postgres:5432/botdb?schema=public
+      NODE_TLS_REJECT_UNAUTHORIZED: "0"  # dev only: bypass corporate MITM for Discord TLS
     depends_on:
       - postgres
       - redis
@@ -14,6 +15,9 @@ services:
     command: ["npm", "--workspace", "apps/bot", "run", "dev"]
     volumes:
       - ./:/workspace
+      - /workspace/node_modules
+      - /workspace/apps/bot/node_modules
+      - /workspace/packages/core/node_modules
     working_dir: /workspace
 
   api:
@@ -32,6 +36,9 @@ services:
     command: ["npm", "--workspace", "apps/api", "run", "dev"]
     volumes:
       - ./:/workspace
+      - /workspace/node_modules
+      - /workspace/apps/api/node_modules
+      - /workspace/packages/core/node_modules
     working_dir: /workspace
     ports:
       - "3000:3000"
@@ -50,6 +57,9 @@ services:
     command: ["npm", "--workspace", "apps/ui", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
     volumes:
       - ./:/workspace
+      - /workspace/node_modules
+      - /workspace/apps/ui/node_modules
+      - /workspace/packages/core/node_modules
     working_dir: /workspace
     ports:
       - "5173:5173"

@@ -1,6 +1,6 @@
 # Bot Discord Tournoi Warhammer 40 000 — Étude et Plan
 
-Date : 29 janvier 2026  
+Date : 2 février 2026  
 Périmètre : application conteneurisée (Docker) fournissant un bot Discord pour l’organisation et le suivi de tournois Warhammer 40 000.
 
 ---
@@ -76,26 +76,18 @@ Périmètre : application conteneurisée (Docker) fournissant un bot Discord pou
 - Répertoires : `/opt/bot-warhammer/{bot,api}/`, `/opt/bot-warhammer/data/{postgres,redis,backups}/`. Séparer du stack Saltbox.
 - Observabilité locale : cAdvisor/node-exporter si Prometheus déjà présent; sinon petit stack prometheus+grafana ou dozzle pour logs.
 
-### B1) Dockerisation (esquisse)
-```dockerfile
-# build stage
-FROM node:20-slim AS build
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --omit=dev=false
-COPY . .
-RUN npm run build
+### B0bis) Référentiel GitHub
+- Créer un repo GitHub privé (ex. `github.com/<org>/bot-warhammer`) et y pousser le monorepo actuel.
+- Activer protections de branche sur `main` (PR obligatoires, CI verte, pas de force-push).
+- Secrets GitHub Actions (si CI) : `DISCORD_TOKEN`, `APP_ID`, `PUBLIC_KEY`, `DATABASE_URL`, `REDIS_URL`, `OPENSSL_LEGACY_PROVIDER=1` si nécessaire.
+- Ignorer `node_modules`, `dist`, `.env*` (déjà couvert par `.gitignore`).
+- Option : labels/Projects pour suivre la checklist B6 et la roadmap MVP.
 
-# runtime
-FROM node:20-slim
-WORKDIR /app
-ENV NODE_ENV=production
-COPY --from=build /app/dist ./dist
-COPY --from=build /app/node_modules ./node_modules
-USER node
-CMD ["node", "dist/bot.js"]
-```
-`docker-compose.yml` (dev) : services `bot`, `api`, `postgres`, `redis`, `pgadmin`/`adminer`; volumes pour migrations.
+### B1) Dockerisation (esquisse)
+- Monorepo avec workspaces `bot`, `api`, `ui`, `packages/core`.
+- `docker-compose.dev.yml` (dev) : services `bot`, `api`, `ui`, `postgres`, `redis` ; `api`/`ui` consomment `packages/core` buildé dans l’image.
+- Images Node 20-slim avec `openssl` installé et Prisma `binaryTargets ["native","debian-openssl-1.1.x","debian-openssl-3.0.x"]`.
+- `.dockerignore` pour exclure `node_modules`, `dist`, `.git` afin de réduire le contexte et le temps de build.
 
 ### B2) Sécurité
 - Secrets : variables d’env (.env ignoré ou secrets manager), rotation périodique tokens Discord.
@@ -119,13 +111,24 @@ CMD ["node", "dist/bot.js"]
 
 ### B5) Roadmap MVP (indicative)
 - S1 : setup repo, docker-compose, app Discord, `/ping`, modèle de données, migrations.
-- S2 : création tournoi, inscriptions, Round 1 Swiss simple, saisie scores, classement.
+- S2 : création tournoi, inscriptions, Round 1 Swiss simple, saisie scores, classement; UI mock pour valider les flux sans Discord.
 - S3 : annonces auto, rappels, exports CSV, observabilité de base.
 - S4 : bêta privée, feedback, durcissement rate limits, doc utilisateur.
 
 ### B6) Prochaines actions recommandées (checklist livrables)
 - [ ] Créer l’application Discord et récupérer `APP_ID`, `PUBLIC_KEY`, `BOT_TOKEN`.
-- [ ] Initialiser le repo (monorepo ou non) avec workspaces `bot` et `api` si besoin.
-- [ ] Écrire le schéma Prisma et exécuter les premières migrations.
-- [ ] Mettre en place `docker-compose.dev` avec Postgres + Redis + bot.
-- [ ] Implémenter la commande `/tournament create` + tests unitaires du moteur de pairings.
+- [ ] Pousser le monorepo sur GitHub privé avec protections de branche et secrets Actions.
+- [x] Écrire le schéma Prisma et exécuter les migrations initiales.
+- [x] Mettre en place `docker-compose.dev` avec Postgres + Redis + API/UI/Bot.
+- [x] Implémenter `/tournament create` + génération Swiss et UI mock pour saisie rapide.
+- [ ] Scénarios e2e Discord (guild de staging) + alerting basique.
+
+### B7) État actuel (dev Docker) et données de test
+- Nom du bot : **Cogitator**.
+- Services : `docker compose -f docker-compose.dev.yml up -d postgres redis api ui bot` (ports : API 3000, UI 5173, Postgres 5432, Redis 6379). 
+- Exemple front : bouton « Charger l’exemple week-end » remplit le formulaire avec le scénario fourni (5 rounds + planning + règlement).
+- Données déjà injectées via l’API (IDs utilisables pour tests de mise à jour) :
+  - SCENARIO DU WEEKEND — `88612991-e775-48f7-b6e1-914d68e33403`
+  - Beta interne — `db08dc1b-0b0a-4c8f-a9c8-c6e6a458fc63`
+  - Draft ITC — `0360c611-c280-4967-9023-e762ee4012c9`
+- Secrets à renseigner pour Discord (env ou secrets CI/CD) : `DISCORD_TOKEN`, `APP_ID`, `PUBLIC_KEY`, `DEV_GUILD_ID`.

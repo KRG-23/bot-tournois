@@ -14,6 +14,13 @@ model Tournament {
   name      String
   timezone  String
   status    String   @default("draft")
+  rulesUrl  String?
+  location  String?
+  startDate DateTime?
+  endDate   DateTime?
+  capacity  Int?
+  roundsJson   Json?
+  scheduleJson Json?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

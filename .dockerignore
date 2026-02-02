@@ -1,0 +1,12 @@
+# exclude local build artifacts and VCS metadata from Docker context
+.git
+node_modules
+dist
+apps/**/dist
+packages/**/dist
+npm-debug.log*
+yarn-error.log*
+.cache
+.DS_Store
+.env
+.env.*

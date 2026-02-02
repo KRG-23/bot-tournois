@@ -13,7 +13,23 @@ app.register(cors, { origin: true });
 
 const tournamentSchema = z.object({
   name: z.string().min(1),
-  timezone: z.string().min(1)
+  timezone: z.string().min(1),
+  rulesUrl: z.string().url().optional(),
+  location: z.string().optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  capacity: z.number().int().positive().optional(),
+  rounds: z
+    .array(
+      z.object({
+        round: z.number().int().positive(),
+        code: z.string(),
+        primary: z.string(),
+        deployment: z.string()
+      })
+    )
+    .optional(),
+  schedule: z.any().optional()
 });
 
 app.get('/health', async () => ({ status: 'ok' }));
@@ -22,10 +38,18 @@ app.post('/tournaments', async (req, reply) => {
   const parsed = tournamentSchema.safeParse(req.body);
   if (!parsed.success) return reply.code(400).send(parsed.error);
 
+  const data = parsed.data;
   const t = await prisma.tournament.create({
     data: {
-      name: parsed.data.name,
-      timezone: parsed.data.timezone
+      name: data.name,
+      timezone: data.timezone,
+      rulesUrl: data.rulesUrl,
+      location: data.location,
+      startDate: data.startDate ? new Date(data.startDate) : undefined,
+      endDate: data.endDate ? new Date(data.endDate) : undefined,
+      capacity: data.capacity,
+      roundsJson: data.rounds ? data.rounds : undefined,
+      scheduleJson: data.schedule ? data.schedule : undefined
     }
   });
   return t;

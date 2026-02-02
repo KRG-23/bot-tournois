@@ -6,6 +6,7 @@ dist
 .env.local
 .env.development.local
 .DS_Store
+docs/etude-faisabilite-bot-warhammer.md
 
 # Prisma
 prisma/.env
