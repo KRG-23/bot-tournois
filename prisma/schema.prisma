@@ -14,6 +14,7 @@ model Tournament {
   name      String
   timezone  String
   status    String   @default("draft")
+  published Boolean  @default(false)
   rulesUrl  String?
   location  String?
   startDate DateTime?
@@ -34,6 +35,7 @@ model Player {
   name         String
   faction      String?
   pseudo       String?
+  discordId    String?
   status       PlayerStatus   @default(PENDING)
   listStatus   ListStatus     @default(LIST_NOT_SUBMITTED)
   paymentStatus PaymentStatus @default(PAYMENT_PENDING)
@@ -44,6 +46,8 @@ model Player {
   tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   pairingsA    Pairing[]  @relation("PlayerA")
   pairingsB    Pairing[]  @relation("PlayerB")
+
+  @@index([discordId])
 }
 
 enum PlayerStatus {
@@ -61,6 +65,12 @@ enum ListStatus {
 enum PaymentStatus {
   PAYMENT_PENDING  // Paiement non reçu
   PAYMENT_ACCEPTED // Paiement reçu/validé
+}
+
+enum PairResult {
+  WIN
+  LOSS
+  DRAW
 }
 
 model Round {
@@ -81,7 +91,12 @@ model Pairing {
   table      Int
   playerAId  String
   playerBId  String?
+  scoreA     Int?
+  scoreB     Int?
+  resultA    PairResult?
+  resultB    PairResult?
   createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   round      Round   @relation(fields: [roundId], references: [id], onDelete: Cascade)
   playerA    Player  @relation("PlayerA", fields: [playerAId], references: [id], onDelete: Cascade)

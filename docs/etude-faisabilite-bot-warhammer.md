@@ -45,6 +45,31 @@ Périmètre : application conteneurisée (Docker) fournissant un bot Discord pou
 - Modèle MVP : Guild, Tournament, Player, Round, Pairing, Standing, Table, Mission, AuditLog.
 - Scalabilité : bot stateless + locks Redis ; sharding si >2 500 guilds; backups réguliers.
 
+### 7) Scénarios métier (nomenclature et données manipulées)
+1. **CréationTournoi** — nom, dates (début/fin), fuseau horaire, lieu, capacité, format (solo/équipe), lien règlement, rounds (code GW/mission/déploiement), planning, frais.  
+2. **PublicationTournoi** — canaux (Discord/embed/annonce), visibilité, lien d’inscription, code d’accès éventuel.  
+3. **InscriptionJoueur** — joueur (pseudo+ID Discord), nom, faction, email (opt), statut inscription (pending/validée), paiement (montant/statut), contraintes (équipe/club), commentaire.  
+4. **ValidationPaiement** — réf paiement, statut, validateur, horodatage.  
+5. **SoumissionListe** — lien/fichier liste, format, statut (soumise/acceptée/refusée), motif refus, version, horodatage.  
+6. **GelListes** — date/heure de gel, portée, verrouillage modifs, publication listes validées.  
+7. **GestionCapacité** — nb max, liste d’attente, auto-promotion, délais de réponse.  
+8. **CheckInJourJ** — présence, heure d’arrivée, table initiale (opt), remarques.  
+9. **GénérationRounds** — round courant, joueurs actifs, seed, règles pairing (suisse/évitements/club/déjà rencontrés), tables.  
+10. **PublicationPairings** — round, pairings (table, joueur A/B), canaux de diffusion, horaires.  
+11. **SaisieScores** — scores primaires/secondaires, W/D/L, validation double, horodatage.  
+12. **ClassementIntermediaire** — standings round N, tie-breakers (SoS, VP, BP, peinture), exports.  
+13. **AppelArbitre** — round, table, motif, statut, décision, pénalités.  
+14. **GestionPénalités** — joueur, type (warning/game loss/DQ), motif, round, historique.  
+15. **GestionForfaits** — drop avant/après round, impact pairings suivants (bye/removal), impact classement.  
+16. **PrixEtRécompenses** — podium, prix peinture/fun, lots, critères, montants.  
+17. **ClôtureTournoi** — validation finale, publication résultats, archivage listes, exports finaux.  
+18. **StatistiquesPostEvent** — stats faction, taux de victoire, perfs par ronde, temps moyen, retours joueurs.  
+19. **NotificationsEtRappels** — rappels deadlines, annonces pairings, changements de table, appels arbitre, push Discord.  
+20. **AdministrationUtilisateurs** — rôles staff (orga/arbitre/scorekeeper), droits par scénario, audit log.  
+
+**Répartition par profil**
+- Scénarios destinés aux admins (orga/arbitres) : CréationTournoi, PublicationTournoi, ValidationPaiement, GelListes, GestionCapacité, CheckInJourJ, GénérationRounds, PublicationPairings, SaisieScores (mode staff), ClassementIntermediaire, AppelArbitre (traitement), GestionPénalités, GestionForfaits, PrixEtRécompenses, ClôtureTournoi, StatistiquesPostEvent, NotificationsEtRappels (paramétrage), AdministrationUtilisateurs.
+- Scénarios utilisables par les joueurs (les admins y ont aussi accès) : InscriptionJoueur, SoumissionListe, SaisieScores (auto-saisie si autorisée), AppelArbitre (ouverture d’un ticket), Consultation des pairings/standings via NotificationsEtRappels.
 ### 7) Risques, parades, plans et comparaisons
 - **Policies Discord / intents**  
   - S1 Intents minimaux + mode dégradé : limiter à GUILDS/GUILD_MESSAGES (+MEMBERS partiel), flag fallback REST, tests intents réduits. Gain : moins exposé aux changements.  
