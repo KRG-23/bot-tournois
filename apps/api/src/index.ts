@@ -3,6 +3,7 @@ import 'dotenv/config';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 import { Player, Round, generateSwissRound } from '@bot-warhammer/core';
 import { prisma } from './prisma';
 
@@ -176,6 +177,10 @@ app.get('/tournaments', async (req, reply) => {
     where.startDate = { gte: now };
   }
 
+  if (q.status) {
+    where.status = q.status;
+  }
+
   if (q.registeredDiscordId) {
     where.players = { some: { discordId: q.registeredDiscordId } };
   } else if (q.notRegisteredDiscordId) {
@@ -199,6 +204,7 @@ app.get('/tournaments', async (req, reply) => {
     endDate: t.endDate,
     capacity: t.capacity,
     timezone: t.timezone,
+    status: t.status,
     playersCount: t.players.length
   }));
 });
@@ -206,11 +212,18 @@ app.get('/tournaments', async (req, reply) => {
 // publier un tournoi (flag published)
 app.patch('/tournaments/:id/publish', async (req, reply) => {
   const tId = req.params['id'];
-  const tournament = await prisma.tournament.update({
-    where: { id: tId },
-    data: { published: true, status: 'published' }
-  });
-  return tournament;
+  try {
+    const tournament = await prisma.tournament.update({
+      where: { id: tId },
+      data: { published: true, status: 'published' }
+    });
+    return tournament;
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+      return reply.code(404).send({ message: 'Tournament not found' });
+    }
+    throw err;
+  }
 });
 
 // mise à jour capacité
@@ -218,11 +231,18 @@ app.patch('/tournaments/:id/capacity', async (req, reply) => {
   const tId = req.params['id'];
   const body = z.object({ capacity: z.number().int().positive() }).safeParse(req.body);
   if (!body.success) return reply.code(400).send(body.error);
-  const tournament = await prisma.tournament.update({
-    where: { id: tId },
-    data: { capacity: body.data.capacity }
-  });
-  return tournament;
+  try {
+    const tournament = await prisma.tournament.update({
+      where: { id: tId },
+      data: { capacity: body.data.capacity }
+    });
+    return tournament;
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+      return reply.code(404).send({ message: 'Tournament not found' });
+    }
+    throw err;
+  }
 });
 
 // pairings d'un round

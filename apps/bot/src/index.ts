@@ -1,6 +1,18 @@
 // @ts-nocheck
 import 'dotenv/config';
-import { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } from 'discord.js';
+import {
+  Client,
+  GatewayIntentBits,
+  REST,
+  Routes,
+  SlashCommandBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle
+} from 'discord.js';
 
 const token = process.env.DISCORD_TOKEN;
 const appId = process.env.APP_ID;
@@ -74,7 +86,9 @@ const commands = [
         .setName('filtre')
         .setDescription('Filtrer par inscription')
         .addChoices(
-          { name: 'Tous les tournois à venir', value: 'tous' },
+          { name: 'Tous', value: 'tous' },
+          { name: 'À venir', value: 'avenir' },
+          { name: 'Terminés', value: 'termines' },
           { name: 'Ceux où je suis inscrit', value: 'inscrit' },
           { name: "Ceux où je ne suis pas encore inscrit (à venir)", value: 'disponible' }
         )
@@ -108,15 +122,22 @@ const commands = [
   new SlashCommandBuilder()
     .setName('cog_tournoi_fermer')
     .setDescription('Clôturer un tournoi')
-    .addStringOption((o) => o.setName('tournoi_id').setDescription('ID du tournoi').setRequired(true))
+    .addStringOption((o) => o.setName('tournoi_id').setDescription('ID du tournoi').setRequired(true)),
+  new SlashCommandBuilder().setName('cog_admin').setDescription('Panneau admin interactif (boutons + modales)')
 ].map((c) => c.toJSON());
 
 async function registerCommands() {
   const rest = new REST({ version: '10' }).setToken(token);
+  // purge global pour supprimer les anciennes commandes
+  await rest.put(Routes.applicationCommands(appId), { body: [] });
+
   if (guildId) {
+    // purge puis push guild pour éviter les commandes fantômes
+    await rest.put(Routes.applicationGuildCommands(appId, guildId), { body: [] });
     await rest.put(Routes.applicationGuildCommands(appId, guildId), { body: commands });
     console.log('✅ Slash commands registered (guild scoped)');
   } else {
+    // si pas de guild, on repousse en global
     await rest.put(Routes.applicationCommands(appId), { body: commands });
     console.log('✅ Slash commands registered (global)');
   }
@@ -132,9 +153,296 @@ async function main() {
   client.once('ready', () => console.log(`🤖 Bot connecté en tant que ${client.user?.tag}`));
 
   client.on('interactionCreate', async (interaction) => {
+    // --- Boutons du panneau admin ---
+  if (interaction.isButton()) {
+    const id = interaction.customId;
+    if (!id.startsWith('admin_')) return;
+
+    // Liste rapide sans modale
+    if (id === 'admin_list') {
+      await interaction.deferReply({ ephemeral: true });
+      try {
+        const res = await fetch(`${apiBase}/tournaments`);
+        if (!res.ok) {
+          const text = await res.text();
+          return interaction.editReply(`Erreur API: ${res.status} ${text}`);
+        }
+        const data = (await res.json()) as any[];
+        if (!data.length) return interaction.editReply('Aucun tournoi trouvé.');
+        const lines = data
+          .slice(0, 15)
+          .map((t) => {
+            const status = t.status ?? 'draft';
+            const date = t.startDate ? new Date(t.startDate).toLocaleDateString('fr-FR') : 'date ?';
+            return `• ${t.name} — ${status} — ${date} — id: \`${t.id}\``;
+          })
+          .join('\n');
+        return interaction.editReply(lines);
+      } catch (err: any) {
+        return interaction.editReply(`Erreur: ${err.message}`);
+      }
+    }
+
+    const modal = new ModalBuilder().setTitle('Action admin').setCustomId(id.replace('admin_', 'modal_'));
+
+      if (id === 'admin_publish') {
+        modal.addComponents(
+          new ActionRowBuilder<TextInputBuilder>().addComponents(
+            new TextInputBuilder()
+              .setCustomId('tournoi_id')
+              .setLabel('ID du tournoi à publier')
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+          )
+        );
+      }
+      if (id === 'admin_capacity') {
+        modal.addComponents(
+          new ActionRowBuilder<TextInputBuilder>().addComponents(
+            new TextInputBuilder()
+              .setCustomId('tournoi_id')
+              .setLabel('ID du tournoi')
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+          ),
+          new ActionRowBuilder<TextInputBuilder>().addComponents(
+            new TextInputBuilder()
+              .setCustomId('capacite')
+              .setLabel('Capacité max')
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+          )
+        );
+      }
+      if (id === 'admin_round') {
+        modal.addComponents(
+          new ActionRowBuilder<TextInputBuilder>().addComponents(
+            new TextInputBuilder()
+              .setCustomId('tournoi_id')
+              .setLabel('ID du tournoi')
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+          )
+        );
+      }
+      if (id === 'admin_pairings') {
+        modal.addComponents(
+          new ActionRowBuilder<TextInputBuilder>().addComponents(
+            new TextInputBuilder()
+              .setCustomId('tournoi_id')
+              .setLabel('ID du tournoi')
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+          ),
+          new ActionRowBuilder<TextInputBuilder>().addComponents(
+            new TextInputBuilder()
+              .setCustomId('round')
+              .setLabel('Round (optionnel)')
+              .setStyle(TextInputStyle.Short)
+              .setRequired(false)
+          )
+        );
+      }
+      if (id === 'admin_scores') {
+        modal.addComponents(
+          new ActionRowBuilder<TextInputBuilder>().addComponents(
+            new TextInputBuilder()
+              .setCustomId('pairing_id')
+              .setLabel('ID du pairing / table')
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+          ),
+          new ActionRowBuilder<TextInputBuilder>().addComponents(
+            new TextInputBuilder()
+              .setCustomId('score_a')
+              .setLabel('Score joueur A')
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+          ),
+          new ActionRowBuilder<TextInputBuilder>().addComponents(
+            new TextInputBuilder()
+              .setCustomId('score_b')
+              .setLabel('Score joueur B')
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+          )
+        );
+      }
+      if (id === 'admin_classement') {
+        modal.addComponents(
+          new ActionRowBuilder<TextInputBuilder>().addComponents(
+            new TextInputBuilder()
+              .setCustomId('tournoi_id')
+              .setLabel('ID du tournoi')
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+          )
+        );
+      }
+      if (id === 'admin_close') {
+        modal.addComponents(
+          new ActionRowBuilder<TextInputBuilder>().addComponents(
+            new TextInputBuilder()
+              .setCustomId('tournoi_id')
+              .setLabel('ID du tournoi à clôturer')
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+          )
+        );
+      }
+
+      await interaction.showModal(modal);
+      return;
+    }
+
+    // --- Soumissions de modales admin ---
+    if (interaction.isModalSubmit()) {
+      const id = interaction.customId;
+      await interaction.deferReply({ ephemeral: true });
+
+      const get = (field: string) => interaction.fields.getTextInputValue(field);
+
+      try {
+        if (id === 'modal_publish') {
+          const tId = get('tournoi_id');
+          const res = await fetch(`${apiBase}/tournaments/${tId}/publish`, { method: 'PATCH' });
+          if (!res.ok) return interaction.editReply(`Erreur API: ${res.status}`);
+          return interaction.editReply(`Tournoi publié: ${tId}`);
+        }
+
+        if (id === 'modal_capacity') {
+          const tId = get('tournoi_id');
+          const cap = Number(get('capacite'));
+          const res = await fetch(`${apiBase}/tournaments/${tId}/capacity`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ capacity: cap })
+          });
+          if (!res.ok) return interaction.editReply(`Erreur API: ${res.status}`);
+          return interaction.editReply(`Capacité mise à jour à ${cap} places.`);
+        }
+
+        if (id === 'modal_round') {
+          const tId = get('tournoi_id');
+          const res = await fetch(`${apiBase}/tournaments/${tId}/rounds/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{}'
+          });
+          if (!res.ok) {
+            const text = await res.text();
+            return interaction.editReply(`Erreur API: ${res.status} ${text}`);
+          }
+          const data = (await res.json()) as any;
+          const lines = data.pairings
+            .map((p: any) => `Table ${p.table}: ${p.playerAId} vs ${p.playerBId ?? 'Bye'}`)
+            .join('\n');
+          return interaction.editReply(`Round ${data.number} généré:\n${lines}`);
+        }
+
+        if (id === 'modal_pairings') {
+          const tId = get('tournoi_id');
+          const roundRaw = interaction.fields.getTextInputValue('round');
+          const rNum = roundRaw ? Number(roundRaw) : undefined;
+          const url = rNum
+            ? `${apiBase}/tournaments/${tId}/pairings?round=${rNum}`
+            : `${apiBase}/tournaments/${tId}/pairings`;
+          const res = await fetch(url);
+          if (!res.ok) {
+            const text = await res.text();
+            return interaction.editReply(`Erreur API: ${res.status} ${text}`);
+          }
+          const data = (await res.json()) as any;
+          const lines = data.pairings
+            .map(
+              (p: any) =>
+                `Table ${p.table}: ${p.playerAId} vs ${p.playerBId ?? 'Bye'}${
+                  p.scoreA != null ? ` — ${p.scoreA}-${p.scoreB}` : ''
+                }`
+            )
+            .join('\n');
+          return interaction.editReply(`Round ${data.number}:\n${lines}`);
+        }
+
+        if (id === 'modal_scores') {
+          const pid = get('pairing_id');
+          const scoreA = Number(get('score_a'));
+          const scoreB = Number(get('score_b'));
+          const res = await fetch(`${apiBase}/pairings/${pid}/scores`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scoreA, scoreB })
+          });
+          if (!res.ok) {
+            const text = await res.text();
+            return interaction.editReply(`Erreur API: ${res.status} ${text}`);
+          }
+          const data = (await res.json()) as any;
+          return interaction.editReply(
+            `Score enregistré pour table ${data.table}: ${data.playerAId} ${data.scoreA}-${data.scoreB} ${data.playerBId ?? 'Bye'}`
+          );
+        }
+
+        if (id === 'modal_classement') {
+          const tId = get('tournoi_id');
+          const res = await fetch(`${apiBase}/tournaments/${tId}/standings`);
+          if (!res.ok) {
+            const text = await res.text();
+            return interaction.editReply(`Erreur API: ${res.status} ${text}`);
+          }
+          const data = (await res.json()) as any[];
+          const top = data.slice(0, 10);
+          const lines = top
+            .map(
+              (p, idx) =>
+                `${idx + 1}. ${p.name}${p.pseudo ? ` (${p.pseudo})` : ''} — ${p.points} pts (W${p.wins}/D${p.draws}/L${p.losses}, VPΔ ${p.vpDiff})`
+            )
+            .join('\n');
+          return interaction.editReply(lines || 'Aucun score enregistré.');
+        }
+
+        if (id === 'modal_close') {
+          const tId = get('tournoi_id');
+          const res = await fetch(`${apiBase}/tournaments/${tId}/close`, { method: 'POST' });
+          if (!res.ok) return interaction.editReply(`Erreur API: ${res.status}`);
+          return interaction.editReply('Tournoi clôturé.');
+        }
+
+        return interaction.editReply('Action admin inconnue.');
+      } catch (err: any) {
+        return interaction.editReply(`Erreur: ${err.message}`);
+      }
+    }
+
+    // --- Slash commands ---
     if (!interaction.isChatInputCommand()) return;
     if (interaction.commandName === 'cog_ping') {
       await interaction.reply({ content: 'Pong!', ephemeral: true });
+      return;
+    }
+
+    if (interaction.commandName === 'cog_admin') {
+      const rows = [
+        new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('admin_publish').setLabel('Publier').setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId('admin_round').setLabel('Générer round').setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId('admin_pairings').setLabel('Pairings').setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId('admin_classement').setLabel('Classement').setStyle(ButtonStyle.Secondary)
+        ),
+        new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('admin_capacity').setLabel('Capacité').setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId('admin_scores').setLabel('Scores table').setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId('admin_close').setLabel('Clôturer').setStyle(ButtonStyle.Danger),
+          new ButtonBuilder().setCustomId('admin_list').setLabel('Lister tournois').setStyle(ButtonStyle.Secondary)
+        )
+      ];
+
+      await interaction.reply({
+        content:
+          'Panneau admin Cogitator — choisis une action. Une modale te demandera les paramètres (ID tournoi, scores, etc.).',
+        components: rows,
+        ephemeral: true
+      });
       return;
     }
 
@@ -225,9 +533,20 @@ async function main() {
       const filtre = interaction.options.getString('filtre') ?? 'tous';
       const userId = interaction.user.id;
       const futureOnly = interaction.options.getBoolean('avenir_uniquement') ?? true;
-      let url = `${apiBase}/tournaments${futureOnly ? '?future=true' : ''}`;
-      if (filtre === 'inscrit') url = `${apiBase}/tournaments?registeredDiscordId=${userId}`;
-      if (filtre === 'disponible') url = `${apiBase}/tournaments?notRegisteredDiscordId=${userId}&future=true`;
+      let url = `${apiBase}/tournaments`;
+
+      if (filtre === 'avenir') {
+        url = `${apiBase}/tournaments?future=true`;
+      } else if (filtre === 'termines') {
+        url = `${apiBase}/tournaments?status=closed`;
+      } else if (filtre === 'inscrit') {
+        url = `${apiBase}/tournaments?registeredDiscordId=${userId}`;
+        if (futureOnly) url += '&future=true';
+      } else if (filtre === 'disponible') {
+        url = `${apiBase}/tournaments?notRegisteredDiscordId=${userId}&future=true`;
+      } else {
+        if (futureOnly) url = `${apiBase}/tournaments?future=true`;
+      }
 
       try {
         const res = await fetch(url);
